@@ -12,7 +12,7 @@ class Helpers extends \dependencies\BaseComponent
       $data = $data->having('app_id', 'app_secret', 'redirect_url', 'scope', 'code', 'error', 'state')
         ->app_id->validate('App ID', array('required', 'string', 'not_empty'))->back()
         ->app_secret->validate('App secret', array('required', 'string', 'not_empty'))->back()
-        ->redirect_url->validate('Redirect URL', array('required', 'url'))->back()
+        ->redirect_url->validate('Redirect URL', array('url'))->back()
       ;
       
       //Use Facebook SDK.
@@ -36,19 +36,30 @@ class Helpers extends \dependencies\BaseComponent
           $method->setAccessible(true);
           $accessToken = $method->invoke($facebook);
           
+          //If there is an accessToken, we are still authenticated.
           if($accessToken)
             return Data(array('facebook_sdk_class' => $facebook));
           
         }
         
-        return Data(array(
-          'login_url' => $facebook->getLoginUrl(array(
-            'redirect_uri' => url($data->redirect_url, true)->output->get(),
-            'display' => 'popup'
-          ))
-        ));
+        //Otherwise see if we can return a login URL.
+        if($data->redirect_url->is_set()){
+          return Data(array(
+            'login_url' => $facebook->getLoginUrl(array(
+              'redirect_uri' => url($data->redirect_url, true)->output->get(),
+              'display' => 'popup'
+            ))
+          ));
+        }
+        
+        //No redirect_url URL means we can't generate a login_url, so just report we're not authenticated.
+        else{
+          return Data(array('authentication_failed' => true));
+        }
         
       }
+      
+      //Swap FacebookAPIExceptions for Expected exceptions.
       catch(\FacebookApiException $ex){ throw new \exception\Expected($ex); }
       
     });
